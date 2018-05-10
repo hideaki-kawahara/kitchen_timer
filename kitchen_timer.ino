@@ -7,7 +7,7 @@ uint32_t targetTime = 0;
 byte omm = 99, oss = 99;
 byte xcolon = 0, xsecs = 0;
 unsigned int colour = 0;
-uint8_t mm=0;
+uint8_t mm=1;
 int8_t ss=10;
 bool hasStop = true;
 bool hasEnd = false;
@@ -52,19 +52,18 @@ void loop() {
       // Set next update for 1 second later
       targetTime = millis() + 1000;
 
-      if (ss==0 && mm ==0 ) {
-        hasStop =true;
-        hasEnd = true;
-        
-      } else if (!hasStop){
+      if (!hasStop){
         // Adjust the time values by adding 1 second
         ss--;              // Advance second
         if (ss == -1) {    // Check for roll-over
-          ss = 59;          // Reset seconds to zero
-          omm = mm;        // Save last minute time for display update
-          mm--;            // Advance minute
           if (mm == 0) {   // Check for roll-over
+            ss =0;
             hasStop = true;
+            hasEnd = true;
+          } else {
+            ss = 59;          // Reset seconds to zero
+            omm = mm;        // Save last minute time for display update
+            mm--;            // Advance minute
           }
         }
       }
