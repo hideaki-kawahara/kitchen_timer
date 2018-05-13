@@ -1,36 +1,37 @@
 #include <M5Stack.h>
-
-#define TFT_GREY 0x5AEB
 boolean but_A = false, but_LEFT = false, but_RIGHT = false;
-
 uint32_t targetTime = 0;
 byte omm = 99, oss = 99;
-byte xcolon = 0, xsecs = 0;
-unsigned int colour = 0;
-uint8_t mm=1;
-int8_t ss=10;
+uint8_t mm = 3;
+int8_t ss= 0;
 bool hasStop = true;
 bool hasEnd = false;
 void setup() {
-  //Serial.begin(115200);
   M5.begin();
-  // M5.Lcd.setRotation(1);
-  M5.Lcd.fillScreen(TFT_BLACK);
-
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setTextColor(TFT_YELLOW, TFT_BLACK);
-
+  M5.Lcd.fillScreen(TFT_LIGHTGREY);
   targetTime = millis() + 1000;
+
+  M5.Lcd.setTextFont(2);
+  M5.Lcd.setTextSize(2);
+  M5.Lcd.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+  M5.Lcd.setCursor( 60, 200);
+  M5.Lcd.print("M");
+  M5.Lcd.setCursor( 150, 200);
+  M5.Lcd.print("S");
+  M5.Lcd.setTextSize(1);
+  M5.Lcd.setCursor( 240, 200);
+  M5.Lcd.print("START");
+  M5.Lcd.setCursor( 240, 220);
+  M5.Lcd.print("/STOP");
+
   Serial.println("START");
 }
 
 void loop() {
   if(M5.BtnC.wasPressed() && !hasStop) {
       hasStop = true;
-      Serial.println("test1");
   } else if (M5.BtnC.wasPressed() && hasStop) {
       hasStop = false;
-      Serial.println("test2");
   }
   if(M5.BtnB.wasPressed() && hasStop) {
       ss++;
@@ -38,6 +39,7 @@ void loop() {
       if (ss == 60){
         ss = 0;
       }
+      draw_seconds(ss);
   }
   if(M5.BtnA.wasPressed() && hasStop) {
       mm++;
@@ -45,66 +47,95 @@ void loop() {
       if (mm == 60){
         mm = 0;
       }
-  }
-  
+      draw_minutes(mm);
+  }  
   M5.update();
     if (targetTime < millis()) {
-      // Set next update for 1 second later
       targetTime = millis() + 1000;
 
+      // 時間停止してない
       if (!hasStop){
-        // Adjust the time values by adding 1 second
-        ss--;              // Advance second
-        if (ss == -1) {    // Check for roll-over
-          if (mm == 0) {   // Check for roll-over
+        ss--;
+        if (ss == -1) {
+          // 分秒ともに0なら表示停止＆timerストップ
+          if (mm == 0) {
             ss =0;
             hasStop = true;
             hasEnd = true;
+            M5.Speaker.beep();
           } else {
-            ss = 59;          // Reset seconds to zero
-            omm = mm;        // Save last minute time for display update
-            mm--;            // Advance minute
+            ss = 59;
+            omm = mm;
+            mm--;
           }
         }
       }
+
       if (hasEnd) {
-        M5.Lcd.setCursor( 100, 180);
-        M5.Lcd.println("Timer Stop");
+        // timerストップの表示
+        M5.Lcd.setCursor( 100, 150);
+        M5.Lcd.setTextFont(2);
+        M5.Lcd.print("Timer Stop");
       } else {
-        M5.Lcd.setCursor( 100, 180);
-        M5.Lcd.println("            ");
+        // 表示を消す
+        M5.Lcd.setCursor( 100, 150);
+        M5.Lcd.setTextFont(2);
+        M5.Lcd.print("          ");
       }
 
-      // Update digital time
-      int xpos = 0;
-      int ypos = 85; // Top left corner ot clock text, about half way down
-      int ysecs = ypos + 24;
-  
-      if (omm != mm) { // Redraw hours and minutes time every minute
+      // 7seg font
+      M5.Lcd.setTextFont(7);
+      M5.Lcd.setTextSize(2);
+      M5.Lcd.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+
+      // 分の更新
+      if (omm != mm) {
         omm = mm;
-        // Draw hours and minutes
-        xcolon = xpos; // Save colon coord for later to flash on/off later
-        if (mm < 10) xpos += M5.Lcd.drawChar('0', xpos, ypos, 8); // Add minutes leading zero
-        xpos += M5.Lcd.drawNumber(mm, xpos, ypos, 8);             // Draw minutes
-        xsecs = xpos; // Sae seconds 'x' position for later display updates
+        draw_minutes(mm);
       }
-      if (oss != ss) { // Redraw seconds time every second
+
+      // 秒の更新
+      if (oss != ss) {
         oss = ss;
-        xpos = xsecs;
-  
-        if (ss % 2) { // Flash the colons on/off
-          M5.Lcd.setTextColor(0x39C4, TFT_BLACK);        // Set colour to grey to dim colon
-          xpos += M5.Lcd.drawChar(':', xsecs, ysecs, 6); // Seconds colon
-          M5.Lcd.setTextColor(TFT_YELLOW, TFT_BLACK);    // Set colour back to yellow
+
+        // インジケーターの点滅
+        if (ss % 2 && !hasStop) {
+          M5.Lcd.setCursor( 150, 40);
+          M5.Lcd.setTextColor(TFT_LIGHTGREY, TFT_LIGHTGREY);
+          M5.Lcd.print(":");
+          M5.Lcd.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
         }
         else {
-          xpos += M5.Lcd.drawChar(':', xsecs, ysecs, 6); // Seconds colon
+          M5.Lcd.setCursor( 150, 40);
+          M5.Lcd.print(":");
         }
-  
-        //Draw seconds
-        if (ss < 10) xpos += M5.Lcd.drawChar('0', xpos, ysecs, 6); // Add leading zero
-        M5.Lcd.drawNumber(ss, xpos, ysecs, 6);                     // Draw seconds
+        
+        draw_seconds(ss);  
       }
     }
+}
+
+// 分の表示
+void draw_minutes(int mm) {
+  if (mm < 10) {
+    M5.Lcd.setCursor( 0, 40);
+    M5.Lcd.print("0");
+    M5.Lcd.print(mm);        
+  } else {
+    M5.Lcd.setCursor( 0, 40);
+    M5.Lcd.print(mm);        
+  }
+}
+
+// 秒の表示
+void draw_seconds(int ss) {
+  if (ss < 10) {
+    M5.Lcd.setCursor( 180, 40);
+    M5.Lcd.print("0");
+    M5.Lcd.print(ss);
+  } else {
+    M5.Lcd.setCursor( 180, 40);
+    M5.Lcd.print(ss);          
+  }
 }
 
